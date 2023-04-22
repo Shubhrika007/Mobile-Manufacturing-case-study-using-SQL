@@ -1,0 +1,169 @@
+MOBILE MANAFACTURING ANALYSIS
+/************************************************************************************************************************************/
+
+QUESTION 1. List all the states in which we have customers who have bought cellphones from 2005 till today.
+
+SOLUTION 1:
+
+SELECT DISTINCT T2.STATE FROM FACT_TRANSACTIONS AS T1
+LEFT JOIN DIM_LOCATION AS T2 ON T1.IDLocation=T2.IDLocation
+WHERE YEAR(T1.Date)> 2005
+
+/************************************************************************************************************************************/
+
+QUESTION 2. What state in the US is buying more 'Samsung' cell phones?
+
+SOLUTION 2:
+
+SELECT TOP 1 T2.STATE
+FROM FACT_TRANSACTIONS AS T1
+LEFT JOIN DIM_LOCATION AS T2 ON T1.IDLocation=T2.IDLocation
+LEFT JOIN DIM_MODEL AS T3 ON T1.IDModel=T3.IDModel
+LEFT JOIN DIM_MANUFACTURER T4 ON T3.IDManufacturer=T4.IDManufacturer
+WHERE T4.Manufacturer_Name='SAMSUNG' AND T2.Country= 'US'
+GROUP BY T2.STATE,T4.Manufacturer_Name
+ORDER BY COUNT(T4.IDManufacturer)  DESC
+
+/************************************************************************************************************************************/
+
+QUESTION 3. Show the number of transactions for each model per zip code per state.
+
+SOLUTION 3:
+SELECT DISTINCT T2.ZipCode,T2.State, T3.IDModel,
+COUNT(T1.Date) AS [NUMBER OF TRANSACTIONS]
+FROM FACT_TRANSACTIONS AS T1
+LEFT JOIN DIM_LOCATION AS T2 ON T1.IDLocation=T2.IDLocation
+LEFT JOIN DIM_MODEL AS T3 ON T1.IDModel=T3.IDModel
+GROUP BY T2.ZipCode,T2.State, T3.IDModel
+
+/************************************************************************************************************************************/
+
+QUESTION 4. Show the cheapest cell phone.
+SOLUTION 4:
+
+SELECT TOP 1 T2.Manufacturer_Name, T1.Model_Name AS[CHEAPEST CELLPHONE] 
+FROM DIM_MODEL AS T1 
+LEFT JOIN DIM_MANUFACTURER AS T2 ON T1.IDManufacturer= T2.IDManufacturer
+ORDER BY T1.Unit_price
+
+/************************************************************************************************************************************/
+
+QUESTION 5: Find out  the average price for each model in the top 5 manafacturers in terms of sales quantity and 
+	    order by average price.
+
+SOLUTION 5:
+
+
+SELECT T3.Manufacturer_Name ,T2.Model_Name, AVG(T1.TOTALPRICE) AS [AVERAGE PRICE] FROM FACT_TRANSACTIONS AS T1
+LEFT JOIN DIM_MODEL AS T2 ON T1.IDModel=T2.IDModel
+INNER JOIN DIM_MANUFACTURER AS T3 ON T2.IDManufacturer=T3.IDManufacturer
+WHERE T3.Manufacturer_Name IN 
+(SELECT TOP 5 T3.Manufacturer_Name
+FROM FACT_TRANSACTIONS AS T1
+LEFT JOIN DIM_MODEL AS T2 ON T1.IDModel=T2.IDModel
+INNER JOIN DIM_MANUFACTURER AS T3 ON T2.IDManufacturer=T3.IDManufacturer
+GROUP BY T3.Manufacturer_Name
+ORDER BY SUM(T1.Quantity) DESC) 
+GROUP BY T2.Model_Name,T3.Manufacturer_Name
+ORDER BY t3.Manufacturer_Name, AVG(T1.TOTALPRICE) DESC
+
+/************************************************************************************************************************************/
+
+QUESTION 6: List the names of the customers and the average amount spent in 2009, where the average is higher than 500.
+
+SOLUTION 6:
+
+SELECT T2.CUSTOMER_NAME, AVG(T1.TotalPrice) AS [AVERAGE SPEND] FROM FACT_TRANSACTIONS AS T1
+LEFT JOIN DIM_CUSTOMER AS T2 ON T1.IDCustomer=T2.IDCustomer
+WHERE YEAR(T1.DATE) =2009
+GROUP BY T2.CUSTOMER_NAME
+HAVING AVG(T1.TotalPrice)>500
+
+/************************************************************************************************************************************/
+
+QUESTION 7: List if there is any model that was in the top 5 in terms of quantity, simultaneously in 2008, 2009 and 2010.
+
+SOLUTION 7:
+
+SELECT [DATASET 1].IDModel, [DATASET 1].Model_Name FROM ((
+SELECT  TOP 5 T2.Model_Name, T2.IDModel FROM FACT_TRANSACTIONS AS T1
+LEFT JOIN DIM_MODEL AS T2 ON T1.IDModel=T2.IDModel
+WHERE YEAR(T1.DATE) = 2010
+GROUP BY T2.Model_Name, T2.IDModel
+ORDER BY
+SUM(T1.QUANTITY) DESC) AS [DATASET 1]
+INNER JOIN (
+SELECT  TOP 5 T2.Model_Name, T2.IDModel FROM FACT_TRANSACTIONS AS T1
+LEFT JOIN DIM_MODEL AS T2 ON T1.IDModel=T2.IDModel
+WHERE YEAR(T1.DATE) = 2009
+GROUP BY T2.Model_Name, T2.IDModel
+ORDER BY
+SUM(T1.QUANTITY) DESC) AS [DATASET 2]
+ON [DATASET 1].IDModel= [DATASET 2].IDModel
+INNER JOIN ( 
+SELECT  TOP 5 T2.Model_Name, T2.IDModel  FROM FACT_TRANSACTIONS AS T1
+LEFT JOIN DIM_MODEL AS T2 ON T1.IDModel=T2.IDModel
+WHERE YEAR(T1.DATE) = 2008
+GROUP BY T2.Model_Name, T2.IDModel
+ORDER BY
+SUM(T1.QUANTITY) DESC) AS [DATASET 3]
+ON [DATASET 2].IDModel= [DATASET 3].IDModel)
+
+/************************************************************************************************************************************/
+
+QUESTION 8: Show the manfacturer with the 2nd top sales in the year 2009 and manafacturer with the 2nd top sales in 2010.
+
+SOLUTION 8:
+
+SELECT MANUFACTURER_NAME, [YEAR] FROM 
+(SELECT M.Manufacturer_Name,   YEAR(FT.Date) AS[YEAR] ,
+ROW_NUMBER() OVER(PARTITION BY YEAR(FT.DATE) ORDER BY SUM(FT.TOTALPRICE) DESC ) AS ROWNUMBER
+FROM DIM_MANUFACTURER AS M 
+INNER JOIN DIM_MODEL AS MD ON M.IDMANUFACTURER = MD.IDMANUFACTURER 
+INNER JOIN FACT_TRANSACTIONS AS FT ON FT.IDMODEL=MD.IDMODEL
+WHERE YEAR(FT.Date) IN (2009,2010)
+GROUP BY M.Manufacturer_Name, YEAR(FT.Date)) AS T 
+WHERE ROWNUMBER=2
+
+/************************************************************************************************************************************/
+
+QUESTION 9: Show the manafacturers that sold cellphone in 2010 but didn't in 2009.
+
+SOLUTION 9:
+
+SELECT DISTINCT T3.MANUFACTURER_NAME FROM
+FACT_TRANSACTIONS AS T1
+LEFT JOIN DIM_MODEL AS T2 ON T1.IDModel=T2.IDModel
+INNER JOIN DIM_MANUFACTURER AS T3 ON T2.IDManufacturer=T3.IDManufacturer
+
+WHERE T3.Manufacturer_Name IN
+(
+(SELECT DISTINCT T3.Manufacturer_Name FROM FACT_TRANSACTIONS AS T1
+LEFT JOIN DIM_MODEL AS T2 ON T1.IDModel=T2.IDModel
+INNER JOIN DIM_MANUFACTURER AS T3 ON T2.IDManufacturer=T3.IDManufacturer
+WHERE YEAR(T1.DATE)=2010) 
+EXCEPT
+(SELECT DISTINCT T3.Manufacturer_Name FROM FACT_TRANSACTIONS AS T1
+LEFT JOIN DIM_MODEL AS T2 ON T1.IDModel=T2.IDModel
+INNER JOIN DIM_MANUFACTURER AS T3 ON T2.IDManufacturer=T3.IDManufacturer
+WHERE YEAR(T1.DATE)=2009))
+
+/************************************************************************************************************************************/
+
+QUESTION 10: Find top 100 cuStomers and their average spend, average quantity by each year. Also find the 
+	     percentage of change in their spend.
+
+SOLUTION 10:
+
+SELECT TOP 100 T4.CUSTOMER_NAME, T4.YEAR, T4.AVERAGE_SPENT, T4.AVERAGE_QUANTITY,
+ISNULL(((([AVERAGE_SPENT]-PREVIOUS_MONTH)/PREVIOUS_MONTH)*100),' ')
+AS PERCENTAGE_CHANGE_IN_AVERAGE_SPENT FROM
+(SELECT
+T2.IDCustomer,T3.YEAR, AVG(T1.TOTALPRICE) AS AVERAGE_SPENT, AVG(T1.QUANTITY) AS AVERAGE_QUANTITY, T2.CUSTOMER_NAME,
+LAG(AVG(T1.TOTALPRICE),1) OVER (PARTITION BY T2.IDCUSTOMER ORDER BY YEAR) PREVIOUS_MONTH
+FROM FACT_TRANSACTIONS AS T1
+INNER JOIN DIM_CUSTOMER AS T2 ON T1.IDCUSTOMER= T2. IDCUSTOMER 
+INNER JOIN DIM_DATE AS T3 ON T1.DATE=T3.DATE
+GROUP BY T2.IDCUSTOMER,T3.YEAR,T2.CUSTOMER_NAME) AS T4
+
+/************************************************************************************************************************************/
